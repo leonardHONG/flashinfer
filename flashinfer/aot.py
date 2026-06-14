@@ -88,6 +88,7 @@ from .jit.gemm import (
 from .jit.mamba import (
     gen_selective_state_update_module,
     gen_selective_state_update_sm90_module,
+    gen_selective_state_update_sm100_module,
 )
 from .jit.mhc import gen_mhc_module
 from .jit.mla import gen_mla_module
@@ -674,6 +675,23 @@ def gen_all_modules(
                     gen_selective_state_update_module(
                         *dtype_combo, dim, dstate, ntokens, cs_dtype, na_dtype
                     )  # type: ignore[call-arg]
+                )
+        # SSU sm100 variant: keep AOT aligned with the runtime SM100-module route
+        # for the currently modeled Blackwell targets: SM100/103/110/120/121.
+        if has_sm100 or has_sm103 or has_sm110 or has_sm120 or has_sm121:
+            for dtype_combo, dim, dstate, ntokens, cs_dtype, na_dtype in product(
+                _ssu_dtype_combos,
+                _ssu_dims,
+                _ssu_dstates,
+                _ssu_ntokens,
+                _ssu_cu_seqlens_dtypes,
+                _ssu_num_accepted_dtypes,
+            ):
+                jit_specs.append(
+                    # same false positive as above
+                    gen_selective_state_update_sm100_module(  # type: ignore[call-arg]
+                        *dtype_combo, dim, dstate, ntokens, cs_dtype, na_dtype
+                    )
                 )
         if has_sm90 or has_sm100:
             for dtype_combo, dim, dstate, ntokens, cs_dtype, na_dtype in product(
