@@ -60,11 +60,14 @@ top_k_top_p_sampling_v128256.json
 top_k_top_p_sampling_v151936.json
 top_p_sampling_v128256.json
 top_p_sampling_v151936.json
+transform_weights_for_sm90_push_e2_h7168_i2048.json
 
 Note: top_p_sampling files appear for vocab_size=151936 because
 top_k_top_p_sampling calls top_p_sampling internally.
 FP4 MoE files are only generated on Blackwell (SM100+) GPUs with fp4_quantize available.
 GDN prefill files require SM90+ (Hopper) GPU.
+transform_weights_for_sm90_push is pure device-agnostic torch math (the SM90
+gate lives in _Sm90PushPipe.__init__), so its trace JSON is generated on any GPU.
 """
 
 import contextlib
@@ -709,6 +712,19 @@ if _fp4_moe_args is not None:
             routing_method_type=5,
             **_fp4_moe_common,
         )
+
+# ── SM90 push MegaMoE weight prep (DeepSeek-V3 shapes, 2 local experts) ──────
+# Pure device-agnostic torch math: runs (and MUST succeed) on any GPU, so no
+# exception suppression -- a silent skip here would let the gate's trace step
+# pass without the JSON it exists to verify.
+from flashinfer.fused_moe import transform_weights_for_sm90_push
+
+_tw_E, _tw_H, _tw_I = 2, 7168, 2048
+_tw_w13 = (
+    torch.randn(_tw_E, 2 * _tw_I, _tw_H, dtype=torch.bfloat16, device=device) * 0.1
+)
+_tw_w2 = torch.randn(_tw_E, _tw_H, _tw_I, dtype=torch.bfloat16, device=device) * 0.1
+transform_weights_for_sm90_push(_tw_w13, _tw_w2, weight_format="bf16")
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 files = sorted(SAVE_DIR.glob("*.json"))

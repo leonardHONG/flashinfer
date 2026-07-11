@@ -1,8 +1,13 @@
 import json
 import os
+import shutil
+import tempfile
 import types
 from pathlib import Path
 from typing import Any, Dict, Set
+
+_DEEP_GEMM_CACHE_DIR = tempfile.mkdtemp(prefix="flashinfer-deep-gemm-tests-")
+os.environ["TRTLLM_DG_CACHE_DIR"] = _DEEP_GEMM_CACHE_DIR
 
 import pytest
 import torch
@@ -15,6 +20,11 @@ from flashinfer.jit import MissingJITCacheError
 # Global tracking for JIT cache coverage
 # Store tuples of (test_name, module_name, spec_info)
 _MISSING_JIT_CACHE_MODULES: Set[tuple] = set()
+
+
+def pytest_unconfigure(config):
+    shutil.rmtree(_DEEP_GEMM_CACHE_DIR, ignore_errors=True)
+
 
 # File path for aggregating JIT cache info across multiple pytest runs
 _JIT_CACHE_REPORT_FILE = os.environ.get("FLASHINFER_JIT_CACHE_REPORT_FILE", None)
@@ -136,6 +146,7 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    os.environ["TRTLLM_DG_CACHE_DIR"] = _DEEP_GEMM_CACHE_DIR
     if os.environ.get("FLASHINFER_TEST_TORCH_COMPILE", "0") == "1":
         if torch_version < TorchVersion("2.4"):
             pytest.skip("torch.compile requires torch >= 2.4")

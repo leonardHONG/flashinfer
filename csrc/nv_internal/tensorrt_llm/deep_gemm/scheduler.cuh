@@ -33,7 +33,17 @@
 
 namespace deep_gemm {
 
-enum class GemmType { Normal, GroupedContiguous, GroupedMasked, GroupedWithOffset, StridedBatched };
+enum class GemmType {
+  Normal,
+  GroupedContiguous,
+  GroupedMasked,
+  GroupedWithOffset,
+  StridedBatched,
+  // fused SwiGLU/quant epilogue: one CTA computes a gate/up tile pair
+  GroupedWithOffsetFc1Fused,
+};
+
+constexpr unsigned kFc1FusedKernelVersion = 3;
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "cppcoreguidelines-pro-type-member-init"
@@ -433,6 +443,86 @@ struct GroupedWithOffsetScheduler {
   }
 };
 
+// Fused-epilogue scheduler: halves GroupedWithOffset's N-block space to
+// (m_block, pair) tasks; group walk / padded-offset bookkeeping unchanged.
+template <uint32_t SHAPE_N, uint32_t BLOCK_M, uint32_t BLOCK_N, uint32_t kNumGroups,
+          uint32_t kNumTMAMulticast, uint32_t kNumNBlocks = ceil_div(SHAPE_N, BLOCK_N),
+          uint32_t kNumNBlocksPerGroup = 16>
+struct GroupedWithOffsetFc1FusedScheduler {
+  static constexpr GemmType gemm_type = GemmType::GroupedWithOffsetFc1Fused;
+  // One task covers TWO interleaved n_blocks (gate + up of the same pair).
+  DG_STATIC_ASSERT(SHAPE_N % (2 * BLOCK_N) == 0, "Interleaved 2I must split into full pairs");
+  static constexpr uint32_t kNumPairs = kNumNBlocks / 2;
+
+  int current_iter = -1;
+  uint32_t curr_group_idx;
+  uint32_t curr_cumsum;
+  int64_t m_offset;
+  int64_t m_padded_4_offset;
+  int64_t m_boundary;
+  int64_t* problem_m_offsets;
+
+  using Input = GroupedWithOffsetSchedulerInput;
+  Input input;
+
+  GroupedWithOffsetFc1FusedScheduler() {}
+
+  __device__ __forceinline__ GroupedWithOffsetFc1FusedScheduler(Input& input) {
+    this->problem_m_offsets = input.problem_m_offsets;
+    curr_group_idx = 0;
+    curr_cumsum = 0;
+  }
+
+  __device__ __forceinline__ uint32_t get_global_m_idx(uint32_t const& block_idx) {
+    return m_offset + block_idx * BLOCK_M;
+  }
+
+  // n index into the interleaved (kNumGroups * SHAPE_N, K) weight for one of
+  // the pair's two tiles (phase 0 = gate, phase 1 = up).
+  __device__ __forceinline__ uint32_t get_global_n_idx_phase(uint32_t const& pair_idx,
+                                                             uint32_t const& phase) {
+    return curr_group_idx * SHAPE_N + (2 * pair_idx + phase) * BLOCK_N;
+  }
+
+  __device__ __forceinline__ uint32_t get_global_scales_a_idx(uint32_t const& block_idx) {
+    return m_padded_4_offset + block_idx * BLOCK_M;
+  }
+
+  // Row of the pair's GATE scale in the interleaved (kNumGroups * SHAPE_N/128,
+  // K/128) row-major scales_b; the up row is the immediately following one.
+  __device__ __forceinline__ uint32_t get_scales_b_row_gate(uint32_t const& pair_idx) {
+    return curr_group_idx * (SHAPE_N / 128) + 2 * pair_idx;
+  }
+
+  __device__ __forceinline__ bool get_next_block(uint32_t& m_block_idx, uint32_t& pair_idx) {
+    ++current_iter;
+    auto const next_block_idx = current_iter * gridDim.x + blockIdx.x;
+    uint32_t num_m_blocks;
+    while (true) {
+      // End of the task
+      if (curr_group_idx == kNumGroups) return false;
+      m_offset = __ldg(problem_m_offsets + curr_group_idx);
+      m_boundary = __ldg(problem_m_offsets + curr_group_idx + 1);
+      m_padded_4_offset = compute_padded_offset(m_offset, curr_group_idx);
+      auto m = m_boundary - m_offset;  // int64_t: SIGNED on purpose
+      // clamp a negative extent to zero blocks BEFORE the unsigned
+      // conversion (a decreasing offsets pair would wrap ceil_div into a
+      // ~2^32 block count); the kernel prologue trap is the primary guard
+      num_m_blocks = m > 0 ? static_cast<uint32_t>(ceil_div(m, static_cast<int64_t>(BLOCK_M))) : 0u;
+      auto current_m_block_cumsum = curr_cumsum + num_m_blocks;
+      if (next_block_idx < current_m_block_cumsum * kNumPairs) break;
+
+      // Move to check the next group
+      curr_group_idx++;
+      curr_cumsum = current_m_block_cumsum;
+    }
+
+    get_swizzled_block_idx<kNumTMAMulticast, kNumPairs, kNumNBlocksPerGroup>(
+        num_m_blocks, next_block_idx - curr_cumsum * kNumPairs, m_block_idx, pair_idx);
+    return true;
+  }
+};
+
 template <uint32_t SHAPE_M, uint32_t BLOCK_M, uint32_t BLOCK_N, uint32_t kNumGroups,
           uint32_t kNumTMAMulticast, uint32_t kNumMBlocks = ceil_div(SHAPE_M, BLOCK_M),
           uint32_t kNumMBlocksPerGroup = 16>
@@ -677,6 +767,10 @@ struct SchedulerSelector {
     if constexpr (GT == GemmType::GroupedWithOffset)
       return GroupedWithOffsetScheduler<SHAPE_N, BLOCK_M, BLOCK_N, kNumGroups, kNumTMAMulticast,
                                         kNumNBlocks, kNumNBlocksPerGroup>();
+    if constexpr (GT == GemmType::GroupedWithOffsetFc1Fused)
+      return GroupedWithOffsetFc1FusedScheduler<SHAPE_N, BLOCK_M, BLOCK_N, kNumGroups,
+                                                kNumTMAMulticast, kNumNBlocks,
+                                                kNumNBlocksPerGroup>();
     if constexpr (GT == GemmType::StridedBatched)
       return StridedBatchedScheduler<SHAPE_N, SHAPE_K, BLOCK_M, BLOCK_N, BLOCK_K, kNumGroups,
                                      kNumTMAMulticast, kNumNBlocks, kNumNBlocksPerGroup>();

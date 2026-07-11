@@ -43,6 +43,28 @@ class CutlassFp8BlockScaleGemmRunnerInterface {
                        size_t shape_k, cudaStream_t stream, float const* scales_a = nullptr,
                        float const* scales_b = nullptr) = 0;
 
+  virtual void moeGemmFc1Fused(void* mat_d_fp8, int64_t d_rows, int64_t a_rows, float* sfa_out,
+                               void const* mat_a, void const* mat_b,
+                               int64_t const* problem_m_offsets, size_t num_problems,
+                               size_t shape_n_interleaved, size_t shape_k, cudaStream_t stream,
+                               float const* scales_a, float const* scales_b) = 0;
+
+  // Workspace-frozen padded-M stride P of the grouped sfa layouts (0 until
+  // getWorkspaceSize); bindings size-check caller buffers against it.
+  virtual int64_t getMoePaddedStride() const = 0;
+
+  // The workspace-frozen row count the grouped A-side TMA descriptors are
+  // DECLARED with (max_shape_m_4_align_; 0 until getWorkspaceSize has run).
+  // TMA clamps loads to the DECLARED box, not the allocation, so an fp8 A
+  // buffer with fewer rows than this is readable out of bounds through the
+  // descriptor even when every offset is valid -- bindings must size-check
+  // the caller's A (and its grouped scales) against it.
+  virtual int64_t getAlignedARows() const = 0;
+  virtual int64_t getFrozenNumProblems() const = 0;
+  virtual int64_t getFrozenMaxShapeN() const = 0;
+  virtual int64_t getFrozenMaxShapeK() const = 0;
+  virtual int64_t getRequiredWorkspaceBytes() const = 0;
+
   virtual void strideBatchGemm(__nv_bfloat16* mat_d, int ld_d, int stride_d, __nv_fp8_e4m3* mat_a,
                                int ld_a, int stride_a, __nv_fp8_e4m3* mat_b, int ld_b, int stride_b,
                                int num_problems, int shape_m, int shape_n, int shape_k,
@@ -92,6 +114,19 @@ class CutlassFp8BlockScaleGemmRunner : public CutlassFp8BlockScaleGemmRunnerInte
                size_t num_problems, size_t shape_n, size_t shape_k, cudaStream_t stream,
                float const* scales_a = nullptr, float const* scales_b = nullptr) override;
 
+  void moeGemmFc1Fused(void* mat_d_fp8, int64_t d_rows, int64_t a_rows, float* sfa_out,
+                       void const* mat_a, void const* mat_b, int64_t const* problem_m_offsets,
+                       size_t num_problems, size_t shape_n_interleaved, size_t shape_k,
+                       cudaStream_t stream, float const* scales_a, float const* scales_b) override;
+
+  int64_t getMoePaddedStride() const override { return max_shape_m_32_align_padded_; }
+
+  int64_t getAlignedARows() const override { return max_shape_m_4_align_; }
+  int64_t getFrozenNumProblems() const override { return frozen_num_problems_; }
+  int64_t getFrozenMaxShapeN() const override { return frozen_max_shape_n_; }
+  int64_t getFrozenMaxShapeK() const override { return frozen_max_shape_k_; }
+  int64_t getRequiredWorkspaceBytes() const override { return required_workspace_bytes_; }
+
   void strideBatchGemm(__nv_bfloat16* mat_d, int ld_d, int stride_d, __nv_fp8_e4m3* mat_a, int ld_a,
                        int stride_a, __nv_fp8_e4m3* mat_b, int ld_b, int stride_b, int num_problems,
                        int shape_m, int shape_n, int shape_k, cudaStream_t stream, float* scales_a,
@@ -121,6 +156,10 @@ class CutlassFp8BlockScaleGemmRunner : public CutlassFp8BlockScaleGemmRunnerInte
   int64_t max_shape_m_4_align_ = 0;
   int64_t max_shape_m_32_align_padded_ = 0;
   int64_t expected_m_ = 0;
+  int64_t frozen_num_problems_ = 0;
+  int64_t frozen_max_shape_n_ = 0;
+  int64_t frozen_max_shape_k_ = 0;
+  int64_t required_workspace_bytes_ = 0;
 };
 
 }  // namespace tensorrt_llm::kernels::fp8_blockscale_gemm

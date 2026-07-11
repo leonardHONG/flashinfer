@@ -14,6 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+# Unified MoE API; the SM90 push EP backend consumes MoEWeightPack's
+# "sm90_push_fp8_block" view.
+from .api import (  # noqa: F401
+    ActivationConfig,
+    ExpertConfig,
+    MoEConfig,
+    MoEWeightPack,
+    QuantConfig,
+    QuantVariant,
+    RoutingConfig,
+)
+
+# SM90 push MegaMoE configs + weight prep. Public surface =
+# flashinfer.moe_ep.MoEEpLayer with Sm90PushEpConfig; the executors stay
+# internal to flashinfer.fused_moe.sm90_push_a2a (tests import them there).
+from .sm90_push_a2a import (  # noqa: F401
+    Sm90PushCombine,
+    Sm90PushConfig,
+    Sm90PushPayload,
+    Sm90PushWeights,
+    make_sm90_push_weights,
+    transform_weights_for_sm90_push,
+)
+
 from .core import (
     convert_to_block_layout,
     cutlass_fused_moe,
@@ -69,6 +93,23 @@ except ImportError:
     _cute_dsl_available = False
 
 __all__ = [
+    # Unified API (scoped to what the SM90 push EP backend consumes)
+    "ActivationConfig",
+    "ExpertConfig",
+    "MoEConfig",
+    "MoEWeightPack",
+    "QuantConfig",
+    "QuantVariant",
+    "RoutingConfig",
+    # SM90 push MegaMoE configs + weight prep (public surface = moe_ep;
+    # executors live in flashinfer.fused_moe.sm90_push_a2a, unexported)
+    "Sm90PushCombine",
+    "Sm90PushConfig",
+    "Sm90PushPayload",
+    "Sm90PushWeights",
+    "make_sm90_push_weights",
+    "transform_weights_for_sm90_push",
+    # Legacy flat APIs
     "ActivationType",
     "Fp8QuantizationType",
     "RoutingMethodType",

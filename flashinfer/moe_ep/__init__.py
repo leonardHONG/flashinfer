@@ -1,24 +1,6 @@
-"""flashinfer.moe_ep — MoE Expert-Parallel dispatch/combine over NCCL-EP and NIXL-EP.
-
-This package is a thin Python wrapper over two transport backends:
-
-- ``flashinfer.moe_ep.nccl_ep``  — primary backend, wraps NVIDIA's ``nccl_ep``
-  (built in-tree from ``3rdparty/nccl/contrib/nccl_ep``).
-- ``flashinfer.moe_ep.nixl_ep``  — alternate backend, wraps ai-dynamo's
-  ``nixl_ep`` (built in-tree from ``3rdparty/nixl/examples/device/ep``).
-
-The shared libraries that back these wrappers (``libnccl_ep.so``,
-``nixl_ep_cpp*.so``, etc.) are produced by the FlashInfer build only when
-``BUILD_NVEP=1`` is set in the env at install time:
-
-    BUILD_NVEP=1 pip install -e ".[nvep]"
-
-Without ``BUILD_NVEP=1`` the package imports succeed but calling
-:func:`create_fleet` raises :class:`MoEEpNotBuiltError` with rebuild
-instructions. This file lays down only the import-time probe and the
-``Fleet`` / ``Handle`` factory plumbing; the actual abstract classes and
-backend implementations land in Part B of the integration plan.
-"""
+"""MoE Expert-Parallel layer over pluggable backends: split transport
+backends (nccl_ep / nixl_ep, require BUILD_NVEP=1) and the whole-layer SM90
+push backend (Sm90PushEpConfig; pure Python + JIT CUDA, no BUILD_NVEP)."""
 
 from __future__ import annotations
 
@@ -57,7 +39,7 @@ from ._validators import (
 from .fleet import Fleet, create_fleet
 from .handle import Handle
 from .layer import MoEEpLayer
-from .split_backends import NcclEpConfig, NvepConfig
+from .split_backends import NcclEpConfig, NvepConfig, Sm90PushEpConfig
 from .tensors import MoEEpTensors
 
 __all__ = [
@@ -89,6 +71,7 @@ __all__ = [
     "NcclEpConfig",
     "NvepConfig",
     "QuantType",
+    "Sm90PushEpConfig",
     "available_backends",
     "create_fleet",
     "have_nccl_ep",

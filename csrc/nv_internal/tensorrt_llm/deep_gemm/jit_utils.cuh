@@ -78,6 +78,8 @@ inline std::string gemm_type_to_string(deep_gemm::GemmType gemm_type) {
       return std::string("GroupedMasked");
     case deep_gemm::GemmType::GroupedWithOffset:
       return std::string("GroupedWithOffset");
+    case deep_gemm::GemmType::GroupedWithOffsetFc1Fused:
+      return std::string("GroupedWithOffsetFc1Fused");
     case deep_gemm::GemmType::StridedBatched:
       return std::string("StridedBatched");
     // Add other GEMM types as needed
@@ -125,6 +127,47 @@ inline int get_smem_size(int num_stages, int k, int block_m, int block_n, int bl
 
     return smem_size;
   }
+}
+
+// Fused-epilogue smem: bf16 gate staging + fp8 out staging + per-row scale
+// slot; scales_b holds the pair's two rows. Per-stage A/B/scales_a match
+// the normal kernel.
+inline int get_smem_size_fc1_fused(int num_stages, int k, int block_m, int block_n,
+                                   int block_k = 128) {
+  int smem_act_bf16 = block_m * block_n * 2;  // gate staging, then swiglu(t) staging
+  int smem_out_fp8 = block_m * block_n;       // quantized pair output
+  int smem_a_per_stage = block_m * block_k;
+  int smem_scales_a_per_stage = block_m * 4;
+  int smem_b_per_stage = block_n * block_k;
+  int smem_scales_b = 2 * div_up(k, block_k) * 4;  // gate row + up row
+  int smem_barrier = num_stages * 8 * 2;
+
+  int smem_size = 0;
+  smem_size += smem_act_bf16;
+  smem_size += smem_out_fp8;
+  smem_size += num_stages * smem_a_per_stage;
+  smem_size += num_stages * smem_scales_a_per_stage;
+  smem_size += num_stages * smem_b_per_stage;
+  smem_size += div_up(smem_scales_b, 8) * 8;
+  smem_size += smem_barrier;
+  return smem_size;
+}
+
+// (block_m, num_stages, smem_size) for the fused-epilogue kernel; BLOCK_N
+// pinned to 128 (one N tile == one 1x128 quant block).
+inline std::tuple<int, int, int> get_fc1_fused_gemm_config(uint32_t expected_m, uint32_t shape_k) {
+  constexpr int block_n = 128;
+  int block_m = expected_m <= 64 ? 64 : 128;
+  constexpr int sm90_capacity = 232448;
+  for (int num_stages : {8, 7, 6, 5, 4}) {
+    int smem_size = get_smem_size_fc1_fused(num_stages, shape_k, block_m, block_n);
+    if (smem_size <= sm90_capacity) {
+      return std::make_tuple(block_m, num_stages, smem_size);
+    }
+  }
+  // K large enough to sink 4 stages does not exist for supported shapes
+  // (K <= 20480 fits >= 4 stages at both block_m values).
+  return std::make_tuple(block_m, 4, get_smem_size_fc1_fused(4, shape_k, block_m, block_n));
 }
 
 inline bool is_tma_multicast_legal(int n, int block_n, int num_tma_multicast, int num_sms) {

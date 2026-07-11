@@ -150,6 +150,8 @@ class RuntimeCache {
         gemm_type = deep_gemm::GemmType::Normal;
       } else if (gemm_type_str == "GroupedWithOffset") {
         gemm_type = deep_gemm::GemmType::GroupedWithOffset;
+      } else if (gemm_type_str == "GroupedWithOffsetFc1Fused") {
+        gemm_type = deep_gemm::GemmType::GroupedWithOffsetFc1Fused;
       } else if (gemm_type_str == "StridedBatched") {
         gemm_type = deep_gemm::GemmType::StridedBatched;
       } else {

@@ -1501,6 +1501,46 @@ void grouped_gemm_dispatch(__nv_fp8_e4m3* mat_a, __nv_fp8_e4m3* mat_b, __nv_bflo
   }
 }
 
+// FC1 + fused SwiGLU/quant epilogue (SM90 push MegaMoE). Pre-quantized fp8
+// A and gate/up-INTERLEAVED fp8 B only -- there is no internal-quantize
+// variant. Output is the fp8 FC2 activation (max_shape_m, shape_n_interleaved
+// / 2) plus its grouped sfa (stride max_shape_m_padded), so no bf16 h tensor
+// ever exists. DeepGEMM JIT only: the fallback Fp8Gemm path has no fused
+// epilogue, and silently degrading to it would break the bit-exact contract
+// with the FA kernel, so we hard-fail instead.
+void fp8_fc1_fused_grouped_gemm_run(__nv_fp8_e4m3* fp8_mat_a, float* scales_a,
+                                    __nv_fp8_e4m3* fp8_mat_b, float* scales_b,
+                                    __nv_fp8_e4m3* mat_d_fp8, int64_t d_rows, int64_t a_rows,
+                                    float* sfa_out, int64_t const* problem_m_offsets,
+                                    int num_problems, int64_t expected_m, int64_t max_shape_m,
+                                    int64_t max_shape_m_padded, int shape_n_interleaved,
+                                    int shape_k, cudaStream_t stream) {
+  if (kNumDeviceSMs < 0) {
+    kNumDeviceSMs = tensorrt_llm::common::getMultiProcessorCount();
+  }
+  TLLM_CHECK_WITH_INFO(getDeepGemmEnabled(),
+                       "moe_gemm_fc1_fused requires the DeepGEMM JIT path (TRTLLM_DG_ENABLED "
+                       "must not be 0 and the JIT compiler must be usable)");
+  TLLM_CHECK_WITH_INFO(shape_n_interleaved % 256 == 0,
+                       "moe_gemm_fc1_fused: interleaved N (2I) must be a multiple of 256");
+  TLLM_CHECK_WITH_INFO(shape_k % 128 == 0, "moe_gemm_fc1_fused: K must be a multiple of 128");
+
+  constexpr uint32_t block_n = 128;
+  constexpr uint32_t block_k = 128;
+  auto [block_m, num_stages, smem_size] = deep_gemm::jit::get_fc1_fused_gemm_config(
+      static_cast<uint32_t>(expected_m), static_cast<uint32_t>(shape_k));
+  auto runtime = deep_gemm::jit::getGlobalCompiler().build(
+      shape_n_interleaved, shape_k, block_m, block_n, block_k, num_problems, num_stages,
+      /*num_tma_multicast=*/1, deep_gemm::GemmType::GroupedWithOffsetFc1Fused);
+  auto kernel = reinterpret_cast<cudaKernel_t>(runtime->getKernel());
+  deep_gemm::runGemmFc1Fused(
+      kernel, fp8_mat_a, fp8_mat_b, mat_d_fp8, d_rows, a_rows, sfa_out, scales_a, scales_b,
+      static_cast<uint32_t>(max_shape_m), static_cast<uint32_t>(shape_n_interleaved),
+      static_cast<uint32_t>(shape_k), static_cast<uint32_t>(block_m), block_n, block_k,
+      static_cast<uint32_t>(num_problems), const_cast<int64_t*>(problem_m_offsets), stream,
+      kNumDeviceSMs, static_cast<uint32_t>(smem_size), static_cast<uint32_t>(max_shape_m_padded));
+}
+
 void fp8_grouped_gemm_run(__nv_bfloat16 const* mat_a, __nv_fp8_e4m3* fp8_mat_a, float* scales_a,
                           __nv_bfloat16 const* mat_b, __nv_fp8_e4m3* fp8_mat_b, float* scales_b,
                           __nv_bfloat16* mat_d, int64_t const* problem_m_offsets, int num_problems,

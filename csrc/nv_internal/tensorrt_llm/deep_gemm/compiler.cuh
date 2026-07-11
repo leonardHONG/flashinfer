@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <chrono>
@@ -30,6 +31,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "jit_utils.cuh"
@@ -134,6 +136,47 @@ inline void setJitIncludeDirs(std::vector<std::filesystem::path> const& dirs) {
   includeDirs = dirs;
 }
 
+inline uint64_t updateSourceHash(uint64_t hash, char const* data, size_t size) {
+  for (size_t i = 0; i < size; ++i) {
+    hash ^= static_cast<uint8_t>(data[i]);
+    hash *= 1099511628211ULL;
+  }
+  return hash;
+}
+
+inline std::string getJitSourceHash() {
+  static const std::string sourceHash = [] {
+    std::vector<std::pair<std::string, std::filesystem::path>> files;
+    for (auto const& includeDir : getJitIncludeDirs()) {
+      auto root = includeDir / "deep_gemm";
+      if (!std::filesystem::exists(root)) continue;
+      for (auto const& entry : std::filesystem::recursive_directory_iterator(root)) {
+        if (!entry.is_regular_file()) continue;
+        auto ext = entry.path().extension().string();
+        if (ext != ".cuh" && ext != ".h" && ext != ".hpp" && ext != ".cu") continue;
+        files.emplace_back(entry.path().lexically_relative(root).generic_string(), entry.path());
+      }
+      break;
+    }
+    // nvcc's frontend misparses `lhs.first < rhs.first` in a generic lambda
+    // as a template-argument list; pair's lexicographic operator< suffices.
+    std::sort(files.begin(), files.end());
+
+    uint64_t hash = 14695981039346656037ULL;
+    std::array<char, 1 << 15> buffer{};
+    for (auto const& [name, path] : files) {
+      hash = updateSourceHash(hash, name.data(), name.size());
+      std::ifstream input(path, std::ios::binary);
+      while (input) {
+        input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        hash = updateSourceHash(hash, buffer.data(), static_cast<size_t>(input.gcount()));
+      }
+    }
+    return std::to_string(hash);
+  }();
+  return sourceHash;
+}
+
 inline std::string generateKernel(uint32_t const shape_n, uint32_t const shape_k,
                                   uint32_t const block_m, uint32_t const block_n,
                                   uint32_t const block_k, uint32_t const num_groups,
@@ -157,6 +200,9 @@ inline std::string generateKernel(uint32_t const shape_n, uint32_t const shape_k
       case deep_gemm::GemmType::GroupedWithOffset:
         input_type = "GroupedWithOffsetSchedulerInput";
         break;
+      case deep_gemm::GemmType::GroupedWithOffsetFc1Fused:
+        input_type = "GroupedWithOffsetSchedulerInput";
+        break;
       case deep_gemm::GemmType::StridedBatched:
         input_type = "StridedBatchedSchedulerInput";
         break;
@@ -176,8 +222,10 @@ inline std::string generateKernel(uint32_t const shape_n, uint32_t const shape_k
     }
   }
 
-  // Modify kernel name based on swapAB to determine which kernel function to use
-  std::string kernel_name = swapAB ? "fp8_gemm_kernel_swapAB" : "fp8_gemm_kernel";
+  std::string kernel_name = swapAB ? "fp8_gemm_kernel_swapAB"
+                                   : (gemm_type == deep_gemm::GemmType::GroupedWithOffsetFc1Fused
+                                          ? "fp8_gemm_kernel_fc1_fused"
+                                          : "fp8_gemm_kernel");
   std::string scheduler_name = swapAB ? "SchedulerSelectorSwapAB" : "SchedulerSelector";
 
   // Create the kernel source code using raw string literal
@@ -258,13 +306,17 @@ class Compiler {
           sm_version);
     }
 
-    // Build signature - simplified, no MD5 calculation
+    std::string fc1_salt = gemm_type == deep_gemm::GemmType::GroupedWithOffsetFc1Fused
+                               ? ("fc1v" + std::to_string(deep_gemm::kFc1FusedKernelVersion) + "_")
+                               : "";
+    std::string source_salt = "src" + getJitSourceHash() + "_";
     std::string name = std::string(swapAB ? "gemm_swapAB_" : "gemm_") + std::to_string(shape_n) +
                        "_" + std::to_string(shape_k) + "_" + std::to_string(block_m) + "_" +
                        std::to_string(block_n) + "_" + std::to_string(block_k) + "_" +
                        std::to_string(num_groups) + "_" + std::to_string(num_stages) +
                        std::to_string(num_groups) + "_" + std::to_string(num_stages) + "_" +
-                       std::to_string(num_tma_multicast) + "_" + gemm_type_to_string(gemm_type);
+                       std::to_string(num_tma_multicast) + "_" + fc1_salt + source_salt +
+                       gemm_type_to_string(gemm_type);
     std::filesystem::path path = getCacheDir() / name;
 
     // Check runtime cache or file system hit

@@ -7991,9 +7991,10 @@ def batch_deepgemm_fp8_nt_groupwise(
     return out
 
 
-@functools.cache
-def get_fp8_blockscale_gemm_runner_sm90():
-    """Get the FP8 block scale GEMM runner module for SM90."""
+def create_fp8_blockscale_gemm_runner_sm90():
+    """Create a NEW, private FP8 block-scale GEMM runner for SM90: the runner
+    is stateful (workspace query + raw workspace pointer), so pipelines that
+    freeze that state at construction need an unshared instance."""
     module = gen_fp8_blockscale_gemm_sm90_module().build_and_load()
     from ..jit import env as jit_env
 
@@ -8002,6 +8003,15 @@ def get_fp8_blockscale_gemm_runner_sm90():
     )
     module.set_deepgemm_jit_include_dirs([deepgemm_include_dir])
     return module.init()
+
+
+@functools.cache
+def get_fp8_blockscale_gemm_runner_sm90():
+    """Get the process-wide SHARED FP8 block scale GEMM runner for SM90.
+
+    Callers of the shared instance must (re)apply their own workspace state
+    before use if anything else may have reconfigured it in between."""
+    return create_fp8_blockscale_gemm_runner_sm90()
 
 
 @flashinfer_api(trace=fp8_blockscale_gemm_sm90_trace)
@@ -8213,10 +8223,10 @@ def fp8_blockscale_gemm_sm90(
 
     # Allocate workspace
     workspace_size = runner.get_workspace_size(M, N, K)
-    workspace = None
-    if workspace_size > 0:
-        workspace = torch.empty(workspace_size, dtype=torch.uint8, device=input.device)
-        runner.configure_workspace(workspace)
+    workspace = torch.empty(
+        max(int(workspace_size), 1), dtype=torch.uint8, device=input.device
+    )
+    runner.configure_workspace(workspace)
 
     runner.run_gemm(input, weight, out, input_scale, weight_scale)
     return out

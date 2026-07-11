@@ -166,6 +166,40 @@ void CutlassFp8BlockScaleGemmRunner<ElementA, ElementB, ElementD>::moeGemm(
 }
 
 template <typename ElementA, typename ElementB, typename ElementD>
+void CutlassFp8BlockScaleGemmRunner<ElementA, ElementB, ElementD>::moeGemmFc1Fused(
+    void* mat_d_fp8, int64_t d_rows, int64_t a_rows, float* sfa_out, void const* mat_a,
+    void const* mat_b, int64_t const* problem_m_offsets, size_t num_problems,
+    size_t shape_n_interleaved, size_t shape_k, cudaStream_t stream, float const* scales_a,
+    float const* scales_b) {
+#ifdef ENABLE_FP8_BLOCK_SCALE
+#ifdef COMPILE_HOPPER_TMA_GEMMS
+  if constexpr (std::is_same_v<ElementA, __nv_fp8_e4m3> &&
+                std::is_same_v<ElementB, __nv_fp8_e4m3>) {
+    // Same stateful contract as moeGemm: getWorkspaceSize must have recorded
+    // the expected-M / padded-stride state (it also fixes sfa_out's stride).
+    TLLM_CHECK_WITH_INFO(expected_m_ > 0 && max_shape_m_4_align_ > 0,
+                         "moeGemmFc1Fused: call getWorkspaceSize first (stateful runner)");
+    TLLM_CHECK_WITH_INFO(scales_a != nullptr && scales_b != nullptr,
+                         "moeGemmFc1Fused: pre-quantized fp8 inputs need both scales");
+    fp8_fc1_fused_grouped_gemm_run(
+        reinterpret_cast<__nv_fp8_e4m3*>(const_cast<void*>(mat_a)), const_cast<float*>(scales_a),
+        reinterpret_cast<__nv_fp8_e4m3*>(const_cast<void*>(mat_b)), const_cast<float*>(scales_b),
+        reinterpret_cast<__nv_fp8_e4m3*>(mat_d_fp8), d_rows, a_rows, sfa_out, problem_m_offsets,
+        static_cast<int>(num_problems), expected_m_, max_shape_m_4_align_,
+        max_shape_m_32_align_padded_, static_cast<int>(shape_n_interleaved),
+        static_cast<int>(shape_k), stream);
+  } else {
+    TLLM_THROW("moeGemmFc1Fused only supports pre-quantized fp8 A and fp8 B.");
+  }
+#else   // COMPILE_HOPPER_TMA_GEMMS
+  TLLM_THROW("fp8 blockscale gemm only support Hopper.");
+#endif  // COMPILE_HOPPER_TMA_GEMMS
+#else   // ENABLE_FP8_BLOCK_SCALE
+  TLLM_THROW("fp8 blockscale gemm only supported on cuda version 12.8 or higher.");
+#endif  // ENABLE_FP8_BLOCK_SCALE
+}
+
+template <typename ElementA, typename ElementB, typename ElementD>
 void CutlassFp8BlockScaleGemmRunner<ElementA, ElementB, ElementD>::strideBatchGemm(
     __nv_bfloat16* mat_d, int ld_d, int stride_d, __nv_fp8_e4m3* mat_a, int ld_a, int stride_a,
     __nv_fp8_e4m3* mat_b, int ld_b, int stride_b, int num_problems, int shape_m, int shape_n,
@@ -239,6 +273,10 @@ size_t CutlassFp8BlockScaleGemmRunner<ElementA, ElementB, ElementD>::getWorkspac
     total_workspace_size +=
         num_problems * div_up(shape_k, 128) * div_up(shape_n, 128) * sizeof(float);
   }
+  frozen_num_problems_ = static_cast<int64_t>(num_problems);
+  frozen_max_shape_n_ = static_cast<int64_t>(shape_n);
+  frozen_max_shape_k_ = static_cast<int64_t>(shape_k);
+  required_workspace_bytes_ = static_cast<int64_t>(total_workspace_size);
 
   return total_workspace_size;
 #else   // ENABLE_FP8_BLOCK_SCALE

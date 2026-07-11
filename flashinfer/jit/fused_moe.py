@@ -243,6 +243,15 @@ def gen_cutlass_fused_moe_module(
     )
 
 
+def gen_sm90_push_a2a_module() -> JitSpec:
+    """SM90 push MegaMoE A2A kernels (single-node NVLink EP; Hopper-only)."""
+    return gen_jit_spec(
+        "sm90_push_a2a",
+        [jit_env.FLASHINFER_CSRC_DIR / "fused_moe" / "sm90_push_a2a_ops.cu"],
+        extra_cuda_cflags=sm90a_nvcc_flags,
+    )
+
+
 def gen_trtllm_gen_fused_moe_sm100_module() -> JitSpec:
     # Fetch "flashinferMetaInfo.h" from the online kernel cache. This file
     # contains the `tllmGenBatchedGemmList` as the list of available kernels

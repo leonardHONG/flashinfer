@@ -365,6 +365,53 @@ void runGemmSwapAB(cudaKernel_t kernel, void* mat_a /* weight*/, int ld_a, void*
   DG_HOST_ASSERT(status == cudaSuccess);
 }
 
+template <typename LayoutIndexType>
+void runGemmFc1Fused(cudaKernel_t kernel, void* mat_a, void* mat_b, void* mat_d_fp8, int64_t d_rows,
+                     int64_t a_rows, float* sfa_out, float* scales_a, float* scales_b,
+                     uint32_t shape_m, uint32_t shape_n_interleaved, uint32_t shape_k,
+                     uint32_t block_m, uint32_t block_n, uint32_t block_k, uint32_t num_groups,
+                     LayoutIndexType* problem_m_offsets, cudaStream_t stream, int num_sms,
+                     uint32_t smem_size, uint32_t max_shape_m_padded) {
+  auto tma_a_desc =
+      make_2d_tma_a_desc(reinterpret_cast<__nv_fp8_e4m3*>(mat_a), shape_m, shape_k, block_m,
+                         block_k, num_groups, GemmType::GroupedWithOffsetFc1Fused);
+  auto tma_b_desc =
+      make_2d_tma_b_desc(reinterpret_cast<__nv_fp8_e4m3*>(mat_b), shape_n_interleaved, shape_k,
+                         block_n, block_k, num_groups, GemmType::GroupedWithOffsetFc1Fused);
+  auto tma_scales_a_desc =
+      make_tma_scales_a_offset_desc(scales_a, max_shape_m_padded, shape_k, block_m, block_k);
+
+  constexpr uint32_t kNumTMAThreads = 128;
+  constexpr uint32_t kNumMathThreadsPerGroup = 128;
+  DG_HOST_ASSERT(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                      smem_size) == cudaSuccess);
+
+  cudaLaunchConfig_t config;
+  config.gridDim = num_sms;
+  config.blockDim = get_num_threads_per_sm<kNumTMAThreads, kNumMathThreadsPerGroup>(
+      static_cast<int32_t>(block_m));
+  config.dynamicSmemBytes = smem_size;
+  config.stream = stream;
+
+  // No TMA multicast: the pair's B tiles are CTA-specific (static-asserted
+  // in the kernel), so the cluster is trivial.
+  cudaLaunchAttribute attr;
+  attr.id = cudaLaunchAttributeClusterDimension;
+  attr.val.clusterDim = {1, 1, 1};
+  config.attrs = &attr;
+  config.numAttrs = 1;
+
+  GroupedWithOffsetSchedulerInput input;
+  input.shape_m = shape_m;
+  input.problem_m_offsets = problem_m_offsets;
+
+  auto status =
+      cudaLaunchKernelEx(&config, kernel, reinterpret_cast<__nv_fp8_e4m3*>(mat_d_fp8), d_rows,
+                         a_rows, sfa_out, static_cast<int64_t>(max_shape_m_padded), scales_b, input,
+                         tma_a_desc, tma_b_desc, tma_scales_a_desc);
+  DG_HOST_ASSERT(status == cudaSuccess);
+}
+
 void runGemm(cudaKernel_t kernel, void* mat_a, uint64_t ld_a, uint64_t stride_a, void* mat_b,
              uint64_t ld_b, uint64_t stride_b, void* mat_d, uint64_t ld_d, uint64_t stride_d,
              float* scales_a, float* scales_b, uint32_t shape_m, uint32_t shape_n, uint32_t shape_k,
