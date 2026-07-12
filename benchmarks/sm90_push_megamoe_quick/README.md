@@ -24,8 +24,8 @@ The benchmark entry points are:
 - `benchmarks/sm90_push_megamoe_quick/summarize.py`: JSON/JSONL report
   generator.
 
-The backend design and correctness contracts are documented in
-`docs/sm90_push_megamoe.md`.
+The correctness contracts are enforced by `tests/moe/test_sm90_push_megamoe.py`
+and `tests/moe/test_moe_ep_sm90_push.py`.
 
 ## Requirements
 

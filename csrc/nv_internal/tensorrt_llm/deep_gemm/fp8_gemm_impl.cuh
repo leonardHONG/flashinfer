@@ -824,7 +824,7 @@ __global__ void __launch_bounds__(
 }
 
 // Fused SwiGLU + 1x128-quant epilogue over gate/up-interleaved weights;
-// bit-exact with the unfused pipeline (docs/sm90_push_megamoe.md).
+// bit-exact with the unfused pipeline.
 // The unfused activation kernel's TU is built with -use_fast_math, so the
 // epilogue divisions use __fdividef to match its div.approx.f32; a plain
 // `/` here would be div.rn.f32 and flip rounding-boundary values.

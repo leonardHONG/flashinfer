@@ -36,8 +36,7 @@ class MoEEpLayer(nn.Module):
     Split backends (``NcclEpConfig`` / ``NvepConfig``) run transport-only
     dispatch/combine over a Fleet; ``Sm90PushEpConfig`` selects the
     whole-layer SM90 push backend (requires ``compute_config`` + ``weights``,
-    constructs eagerly and collectively on every EP rank). Whole-layer
-    lifecycle contract: docs/sm90_push_megamoe.md.
+    constructs eagerly and collectively on every EP rank).
     """
 
     def __init__(

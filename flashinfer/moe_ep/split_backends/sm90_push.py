@@ -35,8 +35,7 @@ if TYPE_CHECKING:
 @dataclass
 class Sm90PushEpConfig:
     """Whole-layer SM90 push backend selector for MoEEpLayer; defaults enable
-    dedup dispatch, grouped combine and the fused FC1 epilogue. Constraints
-    and lifecycle: docs/sm90_push_megamoe.md."""
+    dedup dispatch, grouped combine and the fused FC1 epilogue."""
 
     backend_name: str = "sm90_push"
     capacity_factor: float = 1.0

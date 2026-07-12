@@ -23,8 +23,7 @@
 #include <cstdio>
 
 // Symmetric-window layout + device round protocol for the SM90 push MegaMoE.
-// Full protocol and memory-model argument: docs/sm90_push_megamoe.md; this
-// header keeps only per-helper invariants.
+// Each helper documents the invariant it must uphold.
 
 namespace flashinfer {
 namespace sm90_push {

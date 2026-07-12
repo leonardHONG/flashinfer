@@ -21,8 +21,8 @@ from typing import Dict, Tuple
 
 import torch
 
-COMPACT_EMPTY_EXPERTS = False  # flip if P0.5a case-3 shows zero-M unsupported
-EXPERT_PAD = 1  # flip to 4/128 if P0.5a alignment probe fails
+COMPACT_EMPTY_EXPERTS = False  # the grouped GEMM handles zero-token groups
+EXPERT_PAD = 1  # the kernel needs no per-expert row alignment
 
 _runner = None
 _weight_cache: Dict[int, Tuple[torch.Tensor, ...]] = {}
