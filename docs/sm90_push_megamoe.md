@@ -169,9 +169,8 @@ the epilogue's three divisions use `__fdividef` explicitly. Residual `.ftz`
 caveat: bf16 has subnormals, so FTZ-independence is not claimed; the
 enforced contract is the a2/sfa2 + e2e bit gates. Known trade-off: no
 small-M swapAB tactic, so at small token counts per rank the two-pass K
-sweep can lose to the unfused path
-(`scripts/run_sm90_push_fc1_epilogue_comparison.sh` locates the break-even;
-keep the switch off below it).
+sweep can lose to the unfused path; measure the break-even token count for
+the deployment shape and keep the switch off below it.
 
 Orthogonality: dedup changes only where dispatch payload bytes are stored
 (compact output bit-identical); fusion changes only the FC1->activation
@@ -301,34 +300,18 @@ configuration collectively.
 - `benchmarks/sm90_push_megamoe_quick/README.md`: file map, prerequisites,
   EP4/EP8 command lines, output layout, serving caveats, and the path from a
   short smoke run to the full acceptance gate.
-- `scripts/run_sm90_push_validation.sh`: the full gate (EP1/2/4/8 pytest
-  for both suites, soaks, the feature-combination bench matrix, DSV3-shape
-  steps, trace-JSON regeneration with existence checks). Mandatory pytest
-  steps fail if pytest reports any skipped test, so capability/OOM/JIT
-  skips cannot silently shrink the gate; `-k` deselection stays allowed.
-  `scripts/run_sm90_push_feature_matrix.sh`: counterbalanced feature matrix
-  (even pass count, default 4, mirrored pass pairs asc,desc,desc,asc;
-  per-configuration tables from cross-run medians; headline ratios as the
-  median of per-pass-pair ratios; per-configuration isolated DeepGEMM
-  caches via `TRTLLM_DG_CACHE_DIR`; completeness-enforcing reporter).
-  `scripts/run_sm90_push_fc1_epilogue_comparison.sh`: the fused-FC1 on/off
-  comparison + small-token break-even sweep.
 
 ## 7. Validation
 
-`scripts/run_sm90_push_validation.sh` is the complete validation suite:
-EP1/2/4/8 correctness (both pytest suites, with skips treated as failures),
-200-round soaks per feature combination (`SM90_PUSH_GATE_SOAK_ROUNDS`), the
-bench matrix with same-run NCCL rows (a requested `--nccl-baseline` that
-cannot initialize exits non-zero), DSV3-shape steps at EP8, and trace-JSON
-regeneration (asserting the expected files exist).
-`scripts/run_sm90_push_feature_matrix.sh` produces the counterbalanced
-feature-matrix ratios;
-`scripts/run_sm90_push_fc1_epilogue_comparison.sh` locates the fused-FC1
-small-token break-even. A compute-sanitizer (memcheck + racecheck) run of a
-representative dedup+grouped+fused EP4 config complements the suite: the
-protocol relies on device-scope release/acquire chains and must be
-sanitizer-clean at the tool's supported scope.
+The validation suite is EP1/2/4/8 correctness (both pytest suites, with
+skips treated as failures), 200-round soaks per feature combination
+(`SM90_PUSH_SOAK_ROUNDS`), the feature-combination bench matrix with
+same-run NCCL rows (a requested `--nccl-baseline` that cannot initialize
+exits non-zero), and DSV3-shape steps at EP8, driven through `tests/moe/`
+and `benchmarks/bench_sm90_push_megamoe.py`. A compute-sanitizer (memcheck
++ racecheck) run of a representative dedup+grouped+fused EP4 config
+complements the suite: the protocol relies on device-scope release/acquire
+chains and must be sanitizer-clean at the tool's supported scope.
 
 ## 8. Known risks / open items
 

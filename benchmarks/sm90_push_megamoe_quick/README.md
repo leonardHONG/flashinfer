@@ -24,15 +24,6 @@ The benchmark entry points are:
 - `benchmarks/sm90_push_megamoe_quick/summarize.py`: JSON/JSONL report
   generator.
 
-Longer acceptance scripts live under `scripts/`:
-
-- `scripts/run_sm90_push_validation.sh`: complete correctness, graph, soak,
-  benchmark, and trace gate.
-- `scripts/run_sm90_push_feature_matrix.sh`: five-tier counterbalanced
-  baseline/dedup/grouped/fused performance matrix.
-- `scripts/run_sm90_push_fc1_epilogue_comparison.sh`: focused fused-FC1
-  on/off and small-token break-even scan.
-
 The backend design and correctness contracts are documented in
 `docs/sm90_push_megamoe.md`.
 
@@ -302,12 +293,16 @@ traffic estimate; GPU measurements remain authoritative.
 
 ## Full acceptance
 
-Quick results do not replace:
+Quick results do not replace the full acceptance matrix:
 
 ```bash
-SM90_PUSH_GATE_REQUIRE_GPUS=8 \
-bash scripts/run_sm90_push_validation.sh results/sm90_push_acceptance
+pytest tests/moe/test_sm90_push_megamoe.py tests/moe/test_moe_ep_sm90_push.py
+torchrun --standalone --nproc-per-node=8 -m pytest \
+  tests/moe/test_sm90_push_megamoe.py tests/moe/test_moe_ep_sm90_push.py -k dist
+SM90_PUSH_SOAK_ROUNDS=200 torchrun --standalone --nproc-per-node=8 -m pytest \
+  tests/moe/test_sm90_push_megamoe.py -k soak
 ```
 
-The full gate must pass EP1/2/4/8 correctness, graph replay, failure checks,
-soak, DSV3 random/hot/all-three, and the NCCL comparison without skips.
+plus the benchmark gates of `benchmarks/bench_sm90_push_megamoe.py` per
+routing and feature combination at EP2/4/8, including the DSV3 shapes. All
+of it must pass without skips.
