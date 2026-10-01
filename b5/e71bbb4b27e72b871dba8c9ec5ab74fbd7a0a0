@@ -1,0 +1,47 @@
+flashinfer/fused_moe/cutile/deepseek_fp8.py
+  s_dfbc3e89e44ef9::t_0c6794761d9210 24
+  s_dfbc3e89e44ef9::t_4358711151272f 1-23,25,27-91,93-101,109-132,134-145,147-162,164-166,177-193,195-197,208-220,222-224,228-244,246-629,634,636-637,641-643,652-694
+  s_dfbc3e89e44ef9::t_fb246821d6a3f9 26,92,102-108,133,146,163,167-176,194,198-207,221,225-227,245,630-633,635,638-640,644-651
+flashinfer/fused_moe/__init__.py
+  s_dfbc3e89e44ef9::t_62b2272e66dae0 50-51,98-99,338-341
+flashinfer/fused_moe/api.py
+  s_dfbc3e89e44ef9::t_ff7446d5a5f864 462,1118-1167,1932-1933,1967-1968
+flashinfer/fused_moe/cutile/activation.py
+  s_dfbc3e89e44ef9::t_46e1bc72d78cf1 37,177-183,228-229,231-234,248-249,251-254,297-298,300-303,317-318,320-323,330-331,366-367
+flashinfer/fused_moe/cutile/fp8.py
+  s_dfbc3e89e44ef9::t_f75f0c43356b5f 38,301-304,307,315-319,322,330-343,354-357,359-360,1669-1671,1673,1675-1676,1702-1713
+flashinfer/fused_moe/cutile/moe.py
+  s_dfbc3e89e44ef9::t_146358d1fbd9c8 199-279,289-290,301-302,306-308,316,461,463-464,467,469-471,478-484,497,507-508,770,775-776,789-798,806-812,815-817,835-837,849-925,944,965,979,995-996,1058,1060-1061,1064,1151-1152,1168,1228-1237
+flashinfer/fused_moe/layer.py
+  s_dfbc3e89e44ef9::t_df5bd9832036dd 48-49,85-86,121-122,157-158
+flashinfer/fused_moe/prepare.py
+  s_dfbc3e89e44ef9::t_a5e798f83a1542 51,1686-1728
+flashinfer/fused_moe/runners.py
+  s_dfbc3e89e44ef9::t_488ea4d053ffdd 170,184-189,2941,3157,3183-3197,3240,3244,3246-3248,3272,3319,3443,3481,3483-3485,3489,3519,3614-3615,3754-3862,3866-3867,4336
+flashinfer/moe_ep/backends/split/kernel/fused_moe/backend.py
+  s_dfbc3e89e44ef9::t_f3c1407855a056 79-82,128-130,140-141
+flashinfer/moe_ep/backends/split/kernel/fused_moe/bridge.py
+  s_dfbc3e89e44ef9::t_b4cd210729bc1f 81-82,110-117,153-155,168-171,199-212
+flashinfer/moe_ep/backends/split/kernel/fused_moe/weights.py
+  s_dfbc3e89e44ef9::t_85a7b948a8e768 75-76,94-127
+flashinfer/moe_ep/core/kernel/base.py
+  s_dfbc3e89e44ef9::t_fc3c7787e7a963 26-27
+flashinfer/moe_ep/modes/split_layer.py
+  s_dfbc3e89e44ef9::t_08a365b2bf5e01 501-502
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b5e71bbb4b27e72b871dba8c9ec5ab74fbd7a0a0",
+  "prompts": {},
+  "sessions": {
+    "s_dfbc3e89e44ef9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0e855-ed9a-7d10-823b-324259ef72e2",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "lianghougong <lianghouhong@xiaohongshu.com>"
+    }
+  }
+}
