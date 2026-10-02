@@ -1,0 +1,39 @@
+flashinfer/fused_moe/runners.py
+  s_dfbc3e89e44ef9::t_e6fa00f432c8b8 3773-3774,3776,3801
+  s_dfbc3e89e44ef9::t_5fca86a1fca433 3824-3825,3846,3848
+  s_dfbc3e89e44ef9::t_b494542133a2c8 3775,3812-3814
+  s_dfbc3e89e44ef9::t_4b725fa9611311 3803-3811
+  s_dfbc3e89e44ef9::t_3fc5a5fc79bc29 4368
+  s_dfbc3e89e44ef9::t_1e0c905592fc6c 3802
+flashinfer/fused_moe/cutile/moe.py
+  s_dfbc3e89e44ef9::t_6342303f489aad 329-350,487,497,509-512,1080-1101,1138,1148
+flashinfer/moe_ep/backends/split/kernel/fused_moe/weights.py
+  s_dfbc3e89e44ef9::t_20712b568862ae 76,97-99,113-119
+  s_dfbc3e89e44ef9::t_3fc5a5fc79bc29 84,92-93,100
+flashinfer/fused_moe/api.py
+  s_dfbc3e89e44ef9::t_5fca86a1fca433 1142,1144,1157
+  s_dfbc3e89e44ef9::t_6017f6c60d0699 949
+flashinfer/fused_moe/cutile/deepseek_fp8.py
+  s_dfbc3e89e44ef9::t_f97b5f66875f93 67-69,102-104,486,527,543
+  s_dfbc3e89e44ef9::t_6342303f489aad 293,295,379,397,418,436,457,475,484-485,487-526,528-542,834-860,890
+  s_dfbc3e89e44ef9::t_074c4295851a61 49-56,101,106,109,113
+  s_dfbc3e89e44ef9::t_8064368d799d0f 544-545
+flashinfer/fused_moe/prepare.py
+  s_dfbc3e89e44ef9::t_5fca86a1fca433 1697,1727-1728
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b1165ab8391d783fe5edda79cf2dabcbc2a3d157",
+  "prompts": {},
+  "sessions": {
+    "s_dfbc3e89e44ef9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0e855-ed9a-7d10-823b-324259ef72e2",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "lianghougong <lianghouhong@xiaohongshu.com>"
+    }
+  }
+}
