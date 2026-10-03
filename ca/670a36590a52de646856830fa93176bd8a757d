@@ -1,0 +1,52 @@
+flashinfer/fused_moe/runners.py
+  s_efa43cf333cdf8::t_e2fb0f0bdb4352 3345,3362-3364,3469,3776-3915
+  s_efa43cf333cdf8::t_1ca044a615c671 3916-3927
+flashinfer/fused_moe/cutile/deepseek_fp8.py
+  s_efa43cf333cdf8::t_e2fb0f0bdb4352 1-1065
+tests/moe/test_unified_moe_cutile_deepseek.py
+  s_efa43cf333cdf8::t_4b7d03376ca927 1-150,154-157,160-182,184-237,251-252,260-273
+  s_efa43cf333cdf8::t_b9ba976e93484c 151-153,158-159,183,238-250,253-259
+  s_efa43cf333cdf8::t_69a69228b28823 274-330
+benchmarks/README.md
+  s_efa43cf333cdf8::t_46279d117c37aa 116-117,144-167
+benchmarks/routines/flashinfer_benchmark_utils.py
+  s_efa43cf333cdf8::t_95c58dc39f5971 79-81
+benchmarks/routines/moe_utils.py
+  s_efa43cf333cdf8::t_51e3b80a74f740 563-564
+benchmarks/routines/unified_moe.py
+  s_efa43cf333cdf8::t_a25f4057f6141d 1,22,28-29,62,101-105,153-158,308,317-341,399-409,415-417,425-429,434,436-437,439-440,507-509,521-523,613-618,620-638,649-650,654,658-664,692,719-723,741-759,761-763,787-797,826,844-846
+docs/design_docs/flashinfer_moe_api.md
+  s_efa43cf333cdf8::t_9f1582a042521d 813,818-819
+flashinfer/fused_moe/__init__.py
+  s_efa43cf333cdf8::t_1a54d9c7ca1393 51-52,103-104,349-352
+flashinfer/fused_moe/api.py
+  s_efa43cf333cdf8::t_9da0eeff8dbac3 1274-1325,2154-2155,2191-2192
+flashinfer/fused_moe/cutile/activation.py
+  s_efa43cf333cdf8::t_a8de579467e7f2 37,177-183,228-229,231-234,248-249,251-254,297-298,300-303,317-318,320-323,330-331,366-367
+flashinfer/fused_moe/cutile/fp8.py
+  s_efa43cf333cdf8::t_cfc6b5e9e2a916 38,301-304,307,315-319,322,330-343,354-357,359-360,1669-1671,1673,1675-1676,1702-1713
+flashinfer/fused_moe/cutile/moe.py
+  s_efa43cf333cdf8::t_2476d051b90113 133,156-157,198-200,204,214,225,229-231,239,247-268,405,407,409,412-414,416-419,425-430,432,434-440,449,458,463,503-509,732,737,750-760,768-774,777-779,797,809,828,846,855,864,880,905-926,963,965,967,970-972
+flashinfer/fused_moe/layer.py
+  s_efa43cf333cdf8::t_e1ecbdf5d5d438 49-50,88-89,126-127,164-165
+flashinfer/fused_moe/prepare.py
+  s_efa43cf333cdf8::t_18188eb3cd6181 56,1691-1736
+flashinfer/gemm/kernels/cutile/ragged_block_scaled_bmm_cutile.py
+  s_efa43cf333cdf8::t_b0057832919f98 31-147,227-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ca670a36590a52de646856830fa93176bd8a757d",
+  "prompts": {},
+  "sessions": {
+    "s_efa43cf333cdf8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f4e0-305c-7fa1-913f-4109274378b0",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "lianghougong <lianghouhong@xiaohongshu.com>"
+    }
+  }
+}
