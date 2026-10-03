@@ -1,0 +1,19 @@
+benchmarks/routines/unified_moe.py
+  s_efa43cf333cdf8::t_b3bc221fcf9473 425,434
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a781fb8b401a2bf1bdcc15de0b0322e503a9ec45",
+  "prompts": {},
+  "sessions": {
+    "s_efa43cf333cdf8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f4e0-305c-7fa1-913f-4109274378b0",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "lianghougong <lianghouhong@xiaohongshu.com>"
+    }
+  }
+}
